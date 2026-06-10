@@ -90,9 +90,11 @@ youtube:
   search_terms:
     - "Love Island USA season 8 recap"
     - "Love Island USA reaction"
+    - "Love Island USA season 8"
+    - "Love Island USA episode recap"
   channels: []                 # optional: specific channel IDs
-  max_videos: 8                # kept modest for the $5 budget; raise anytime
-  max_comments_per_video: 60
+  max_videos: 40               # MAX firehose
+  max_comments_per_video: 300
 
 # ------------------------------------------------------------
 #  GDELT NEWS — query terms (no API key needed).
@@ -101,7 +103,7 @@ gdelt:
   query_terms:
     - "Love Island USA"
     - "Love Island"
-  max_records: 100
+  max_records: 250
 
 # ------------------------------------------------------------
 #  BLUESKY — public posts via search (needs BLUESKY_HANDLE +
@@ -111,7 +113,21 @@ bluesky:
   queries:
     - "love island usa"
     - "#loveislandusa"
-  max_per_query: 100        # per run; raise for more coverage (more scoring cost)
+    - "love island usa season 8"
+    # contestant-aware (kept contextual with "love island" to avoid noise):
+    - "Sincere love island"
+    - "Melanie love island"
+    - "Sol love island"
+    - "Gabriel love island"
+    - "Kenzie love island"
+    - "Caleb love island"
+    - "Bryce love island"
+    - "Trinity love island"
+    - "Aniya love island"
+    - "KC love island"
+    - "Zach love island"
+    - "Corbin love island"
+  max_per_query: 500        # MAX firehose
 
 # ------------------------------------------------------------
 #  TUMBLR — posts under these tags (needs TUMBLR_API_KEY in .env).
@@ -121,7 +137,9 @@ tumblr:
   tags:
     - "love island usa"
     - "loveislandusa"
-  max_per_tag: 100          # per run; raise for more coverage (more scoring cost)
+    - "love island usa season 8"
+  # 400 (not 500) to stay under Tumblr's daily API request limit.
+  max_per_tag: 400
 
 # ------------------------------------------------------------
 #  REDDIT — used only once your Reddit API access is approved.
