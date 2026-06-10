@@ -46,13 +46,12 @@ def collect(config: Config, since: datetime, sources: Optional[list[str]] = None
 
 def score(config: Config, limit: Optional[int] = None, model: Optional[str] = None) -> int:
     """Score any unscored stored items. Returns items scored."""
-    raise NotImplementedError(
-        "score() is wired up in the sentiment module step."
-    )
+    from .sentiment.scorer import score_unscored  # imported lazily (needs anthropic)
+    return score_unscored(config, limit, model)
 
 
 def run(config: Config, since: datetime, sources: Optional[list[str]] = None) -> tuple[int, int]:
     """collect() then score(). Returns (items_added, items_scored)."""
-    raise NotImplementedError(
-        "run() is wired up in the 'wire run' step (after sentiment)."
-    )
+    added = collect(config, since, sources)
+    scored = score(config)
+    return added, scored
