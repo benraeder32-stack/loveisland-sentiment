@@ -54,8 +54,13 @@ youtube:
 #  GDELT NEWS — news-article query terms (no API key needed).
 # ------------------------------------------------------------
 gdelt:
+  # GDELT indexes a limited set of news outlets, so the exact phrase
+  # "Love Island USA" is often sparse. We also include the broader "Love Island"
+  # — while the US season is airing, most coverage is about this show. If you see
+  # unrelated (e.g. UK-season) articles, remove the broader term below.
   query_terms:
     - "Love Island USA"
+    - "Love Island"
   max_records: 100
 
 # ------------------------------------------------------------

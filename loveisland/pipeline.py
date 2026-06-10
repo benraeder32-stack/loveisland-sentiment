@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from .collectors.news_gdelt import GdeltNewsCollector
 from .collectors.youtube import YouTubeCollector
 from .config import Config
 from .normalize import normalize_items
@@ -15,7 +16,7 @@ from .store import db
 # Source name → collector class. v1 sources are added as they are built.
 SOURCES: dict[str, type] = {
     "youtube": YouTubeCollector,
-    # "news": GdeltNewsCollector,   ← added in the GDELT step
+    "news": GdeltNewsCollector,
 }
 
 

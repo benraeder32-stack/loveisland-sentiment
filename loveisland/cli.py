@@ -17,8 +17,9 @@ import warnings
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-# Quiet Google's "Python 3.9 is old" notices — harmless, just noisy.
+# Quiet harmless environment notices (old Python / LibreSSL) so output stays clean.
 warnings.filterwarnings("ignore", category=FutureWarning, module=r"google\..*")
+warnings.filterwarnings("ignore", message=r".*OpenSSL.*")
 
 from . import __version__, pipeline
 from .config import ROOT, load_config
