@@ -88,9 +88,21 @@ launchctl bootout gui/$(id -u)/com.loveisland.sentiment    # stop/disable
 tail -f outputs/cron.log                                  # watch the log
 ```
 
-Change the cadence by editing `StartInterval` (seconds) in the plist, then
-re-load it. It runs while the Mac is awake and you're logged in. A cron line is
-an equivalent alternative:
+The plist uses `StartCalendarInterval` to run at fixed clock times every 3 hours
+(00,03,06,09,12,15,18,21). Change those entries and re-load to adjust cadence.
+It runs while the Mac is awake/logged in; launchd also runs one catch-up when
+the Mac wakes from sleep.
+
+**Hands-off wake (optional):** schedule the Mac to wake itself so runs fire even
+when it's asleep (Apple Silicon wakes from sleep, not full shutdown; keep it
+plugged in):
+```bash
+sudo pmset repeat wakeorpoweron MTWRFSU 23:55:00   # wake nightly for the midnight run
+pmset -g sched                                     # verify
+sudo pmset repeat cancel                           # remove
+```
+
+A cron line is an equivalent alternative to the LaunchAgent:
 ```cron
 0 */3 * * *  cd /path/to/loveisland-sentiment && .venv/bin/python scripts/run_pipeline.py
 ```

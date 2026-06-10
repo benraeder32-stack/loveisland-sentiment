@@ -14,15 +14,23 @@
     <key>WorkingDirectory</key>
     <string>/Users/benraeder/Documents/Love Island/loveisland-sentiment</string>
 
-    <!-- Run every 3 hours (10800 seconds). -->
-    <key>StartInterval</key>
-    <integer>10800</integer>
+    <!-- Run at fixed clock times, every 3 hours. launchd also runs a missed
+         time once when the Mac wakes, so sleep gaps get a catch-up run. -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
+    </array>
 
-    <!-- Don't run the moment it's loaded; wait for the first interval. -->
     <key>RunAtLoad</key>
     <false/>
 
-    <!-- Append all output to a log file (gitignored). -->
     <key>StandardOutPath</key>
     <string>/Users/benraeder/Documents/Love Island/loveisland-sentiment/outputs/cron.log</string>
     <key>StandardErrorPath</key>
