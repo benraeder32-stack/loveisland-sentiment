@@ -7,16 +7,20 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from .collectors.bluesky import BlueskyCollector
 from .collectors.news_gdelt import GdeltNewsCollector
+from .collectors.tumblr import TumblrCollector
 from .collectors.youtube import YouTubeCollector
 from .config import Config
 from .normalize import normalize_items
 from .store import db
 
-# Source name → collector class. v1 sources are added as they are built.
+# Source name → collector class. All are free, read-only, sanctioned APIs.
 SOURCES: dict[str, type] = {
     "youtube": YouTubeCollector,
     "news": GdeltNewsCollector,
+    "bluesky": BlueskyCollector,
+    "tumblr": TumblrCollector,
 }
 
 

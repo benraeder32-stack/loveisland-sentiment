@@ -8,7 +8,9 @@ requests>=2.31        # talks to web APIs (GDELT news)
 
 # ── Collectors ─────────────────────────────────────────────
 google-api-python-client>=2.100   # YouTube Data API
+atproto>=0.0.46                    # Bluesky (read-only search)
 praw>=7.7                          # Reddit (read-only; stub until approved)
+# Tumblr uses `requests` (above) — no extra package needed.
 
 # ── Sentiment scoring ──────────────────────────────────────
 anthropic>=0.39       # Claude API for scoring sentiment

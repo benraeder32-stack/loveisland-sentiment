@@ -104,6 +104,26 @@ gdelt:
   max_records: 100
 
 # ------------------------------------------------------------
+#  BLUESKY — public posts via search (needs BLUESKY_HANDLE +
+#  BLUESKY_APP_PASSWORD in .env). Add contestant names to widen reach.
+# ------------------------------------------------------------
+bluesky:
+  queries:
+    - "love island usa"
+    - "#loveislandusa"
+  max_per_query: 200
+
+# ------------------------------------------------------------
+#  TUMBLR — posts under these tags (needs TUMBLR_API_KEY in .env).
+#  Tumblr is big Love Island fandom territory; add contestant tags too.
+# ------------------------------------------------------------
+tumblr:
+  tags:
+    - "love island usa"
+    - "loveislandusa"
+  max_per_tag: 200
+
+# ------------------------------------------------------------
 #  REDDIT — used only once your Reddit API access is approved.
 # ------------------------------------------------------------
 reddit:
