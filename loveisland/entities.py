@@ -1,8 +1,12 @@
 """Config-driven entity tagging.
 
 Reads the contestant/couple roster from config.yaml and tags a piece of text
-with the contestant or couple it most likely refers to, using the canonical
-names plus any aliases/nicknames.
+with the contestant or couple it most likely refers to.
+
+Matching rules (couples are checked first):
+  * A COUPLE matches when its ship-name/alias appears (e.g. "Zryce"), OR when
+    *all* of its members are mentioned (nickname-aware, e.g. "Bea" → Beatriz).
+  * Otherwise an individual CONTESTANT matches on their name or any alias.
 
 This is a coarse, first-pass tag stored on every record. The sentiment module
 later produces finer, per-entity "aspect" tags via the LLM.
@@ -16,41 +20,59 @@ from typing import Optional
 from .config import Config
 
 
-class EntityTagger:
-    """Precompiles name/alias patterns from config for fast matching."""
+def _compile(names: list[str]) -> Optional[re.Pattern]:
+    terms = [re.escape(n.strip()) for n in names if n and n.strip()]
+    if not terms:
+        return None
+    return re.compile(r"\b(" + "|".join(terms) + r")\b", re.IGNORECASE)
 
+
+class EntityTagger:
     def __init__(self, config: Config):
         entities = config.get("entities", {}) or {}
-        # Each pattern entry: (compiled_regex, canonical_name, entity_type)
-        self._patterns: list[tuple[re.Pattern, str, str]] = []
 
-        for couple in entities.get("couples", []) or []:
-            names = [couple.get("canonical", "")]
-            names += couple.get("aliases", []) or []
-            names += couple.get("members", []) or []
-            self._add(names, couple.get("canonical", ""), "couple")
-
+        # canonical (lowercased) -> [name + aliases], so couple members can be
+        # matched by any of a person's names.
+        self._names_by_person: dict[str, list[str]] = {}
+        self._contestants: list[tuple[re.Pattern, str]] = []
         for person in entities.get("contestants", []) or []:
-            names = [person.get("canonical", "")]
-            names += person.get("aliases", []) or []
-            self._add(names, person.get("canonical", ""), "contestant")
+            canonical = (person.get("canonical") or "").strip()
+            if not canonical:
+                continue
+            names = [canonical] + (person.get("aliases") or [])
+            self._names_by_person[canonical.lower()] = names
+            pattern = _compile(names)
+            if pattern:
+                self._contestants.append((pattern, canonical))
 
-    def _add(self, names: list[str], canonical: str, entity_type: str) -> None:
-        terms = [re.escape(n.strip()) for n in names if n and n.strip()]
-        if not terms or not canonical:
-            return
-        pattern = re.compile(r"\b(" + "|".join(terms) + r")\b", re.IGNORECASE)
-        self._patterns.append((pattern, canonical, entity_type))
+        # couple -> (canonical, alias/ship pattern, [per-member patterns])
+        self._couples: list[tuple[str, Optional[re.Pattern], list[re.Pattern]]] = []
+        for couple in entities.get("couples", []) or []:
+            canonical = (couple.get("canonical") or "").strip()
+            if not canonical:
+                continue
+            alias_pattern = _compile([canonical] + (couple.get("aliases") or []))
+            member_patterns = []
+            for member in couple.get("members") or []:
+                names = self._names_by_person.get(member.strip().lower(), [member])
+                pat = _compile(names)
+                if pat:
+                    member_patterns.append(pat)
+            self._couples.append((canonical, alias_pattern, member_patterns))
 
     def tag(self, text: str) -> tuple[Optional[str], Optional[str]]:
-        """Return (entity, entity_type) for the first match, else (None, None).
-
-        Couples are checked before individuals so a ship-name wins over a
-        single member's name.
-        """
+        """Return (entity, entity_type), or (None, None) if nothing matches."""
         if not text:
             return None, None
-        for pattern, canonical, entity_type in self._patterns:
+
+        for canonical, alias_pattern, member_patterns in self._couples:
+            if alias_pattern and alias_pattern.search(text):
+                return canonical, "couple"
+            if member_patterns and all(p.search(text) for p in member_patterns):
+                return canonical, "couple"
+
+        for pattern, canonical in self._contestants:
             if pattern.search(text):
-                return canonical, entity_type
+                return canonical, "contestant"
+
         return None, None

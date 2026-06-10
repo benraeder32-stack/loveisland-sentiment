@@ -1,39 +1,81 @@
 # ============================================================
-#  Love Island USA — Sentiment Tracker settings
+#  Love Island USA — Sentiment Tracker settings  (Season 8)
 #  ------------------------------------------------------------
-#  This is the ONE file you edit by hand. It is plain text.
-#  Lines beginning with "#" are notes and are ignored.
-#  Keep the indentation (the leading spaces) exactly as shown.
+#  Plain text. Lines beginning with "#" are notes and ignored.
+#  Keep the indentation (leading spaces) exactly as shown.
 # ============================================================
 
 show: "Love Island USA"
-season: 0          # <-- FILL IN: the current season number, e.g. 7
+season: 8
 
 # ------------------------------------------------------------
-#  CAST ROSTER  ← the main thing for you to fill in.
-#
-#  canonical : the official name, shown in the dashboard.
-#  aliases   : nicknames / handles fans use, so a comment gets
-#              tagged to the right person even without the full name.
-#
-#  Add one "- canonical:" block per contestant. Copy the example.
+#  CAST ROSTER
+#  canonical = official name shown in the dashboard.
+#  aliases   = nicknames fans use, so comments tag correctly.
 # ------------------------------------------------------------
 entities:
   contestants:
-    - canonical: "Firstname Lastname"        # <-- example — replace
-      aliases: ["Firstname", "a nickname"]
-    # - canonical: "Another Person"
-    #   aliases: ["nick", "@handle"]
+    # — Girls —
+    - canonical: "Aniya"
+    - canonical: "Beatriz"
+      aliases: ["Bea"]
+    - canonical: "Kenzie"
+    - canonical: "Melanie"
+      aliases: ["Mel"]
+    - canonical: "Trinity"
+    - canonical: "Kayda"          # bombshell
+    - canonical: "Jen"            # bombshell, currently single
+    - canonical: "Sol"            # bombshell, currently single
+    # — Boys —
+    - canonical: "Bryce"
+    - canonical: "KC"
+    - canonical: "Sean"           # dumped — no longer in the villa
+    - canonical: "Sincere"
+    - canonical: "Zach"
+    - canonical: "Gabriel"        # bombshell
+    - canonical: "Corbin"         # bombshell
+    - canonical: "Caleb"          # bombshell, currently single
 
   couples:
-    - canonical: "Name A & Name B"           # <-- example — replace
-      members: ["Name A", "Name B"]
-      aliases: ["their ship name"]
-    # - canonical: "Name C & Name D"
-    #   members: ["Name C", "Name D"]
-    #   aliases: ["shipname"]
+    # — Established couples —
+    - canonical: "Aniya & KC"
+      members: ["Aniya", "KC"]
+    - canonical: "Beatriz & Gabriel"
+      members: ["Beatriz", "Gabriel"]
+    - canonical: "Kenzie & Corbin"
+      members: ["Kenzie", "Corbin"]
+    - canonical: "Melanie & Sincere"
+      members: ["Melanie", "Sincere"]
+    - canonical: "Trinity & Bryce"
+      members: ["Trinity", "Bryce"]
+    - canonical: "Kayda & Zach"
+      members: ["Kayda", "Zach"]
+    # — Love-triangle tensions / joke ships fans discuss —
+    - canonical: "Sol & Sincere"
+      members: ["Sol", "Sincere"]
+    - canonical: "Caleb & Kenzie"
+      members: ["Caleb", "Kenzie"]
+    - canonical: "Zach & Bryce"
+      members: ["Zach", "Bryce"]
+      aliases: ["Zryce"]
 
-# General show keywords used to find and filter relevant content.
+# ------------------------------------------------------------
+#  SEASON CONTEXT — free text fed to the scoring model so it
+#  understands references, drama, and who's with whom.
+# ------------------------------------------------------------
+context: >
+  Season 8 of Love Island USA. Established couples: Aniya & KC, Beatriz (Bea) &
+  Gabriel, Kenzie & Corbin, Melanie (Mel) & Sincere, Trinity & Bryce, Kayda &
+  Zach. Bombshells who entered after the start: girls Kayda, Jen, Sol; boys
+  Gabriel, Corbin, Caleb. Jen, Sol, and Caleb are currently single (Jen, Sol,
+  and Caleb entered as bombshells about two episodes ago). Sean (a boy) was
+  dumped and has left the villa. Ongoing tensions / love triangles fans talk
+  about: Sol and Sincere are into each other even though Sincere is coupled with
+  Melanie; Caleb and Kenzie are into each other even though Kenzie is coupled
+  with Corbin. Gabriel is known for making out with many people. Zach and Bryce
+  are sometimes jokingly shipped as "Zryce" even though both are guys.
+
+# General show keywords.
 keywords:
   - "Love Island USA"
   - "LoveIslandUSA"
@@ -41,23 +83,21 @@ keywords:
 
 # ------------------------------------------------------------
 #  YOUTUBE — recap / reaction videos to read comments from.
+#  Caps kept modest so each run stays fast and cheap; raise once
+#  you're comfortable. (Re-runs skip already-seen comments.)
 # ------------------------------------------------------------
 youtube:
   search_terms:
-    - "Love Island USA recap"
+    - "Love Island USA season 8 recap"
     - "Love Island USA reaction"
-  channels: []                 # optional: specific channel IDs to pull from
-  max_videos: 15               # videos to scan per run
-  max_comments_per_video: 200
+  channels: []                 # optional: specific channel IDs
+  max_videos: 12
+  max_comments_per_video: 100
 
 # ------------------------------------------------------------
-#  GDELT NEWS — news-article query terms (no API key needed).
+#  GDELT NEWS — query terms (no API key needed).
 # ------------------------------------------------------------
 gdelt:
-  # GDELT indexes a limited set of news outlets, so the exact phrase
-  # "Love Island USA" is often sparse. We also include the broader "Love Island"
-  # — while the US season is airing, most coverage is about this show. If you see
-  # unrelated (e.g. UK-season) articles, remove the broader term below.
   query_terms:
     - "Love Island USA"
     - "Love Island"
@@ -65,7 +105,6 @@ gdelt:
 
 # ------------------------------------------------------------
 #  REDDIT — used only once your Reddit API access is approved.
-#  (Stays switched off until then; v1 runs fine without it.)
 # ------------------------------------------------------------
 reddit:
   subreddits:
@@ -74,17 +113,25 @@ reddit:
   max_comments_per_post: 200
 
 # ------------------------------------------------------------
-#  EPISODES — air dates, so comments can be tagged to an episode.
-#  window_hours = how long after airing still counts as that episode.
+#  AIR SCHEDULE (US Eastern). Episodes air Sun/Mon/Tue/Thu/Fri
+#  ~9pm. Saturday is the "Aftersun"-style talk show (not counted).
+#  Used to time scheduled collection runs around new episodes.
 # ------------------------------------------------------------
+schedule:
+  timezone: "America/New_York"
+  air_nights: ["Sun", "Mon", "Tue", "Thu", "Fri"]
+  air_time: "21:00"
+
+# EPISODES — add air dates here to tag comments to a specific episode.
+# (Optional. Time-over-time tracking works without this.)
 episodes: []
   # - number: 1
-  #   air_date: "2026-06-03T21:00:00-04:00"   # date+time WITH timezone
-  #   window_hours: 48
+  #   air_date: "2026-06-01T21:00:00-04:00"
+  #   window_hours: 24
 
 # ------------------------------------------------------------
 #  SENTIMENT scoring settings.
 # ------------------------------------------------------------
 sentiment:
-  model: "claude-haiku-4-5"    # fast + inexpensive; can swap for a stronger model
+  model: "claude-haiku-4-5"    # fast + inexpensive
   batch_size: 20               # comments scored per API call

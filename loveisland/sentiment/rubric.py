@@ -67,4 +67,10 @@ def build_system_prompt(config: Config) -> str:
                                       f"aliases: {aliases}" if aliases else ""] if p)
         lines.append(f"  [couple] {canonical}" + (f" ({extra})" if extra else ""))
 
-    return SYSTEM_RUBRIC + "\n" + "\n".join(lines)
+    prompt = SYSTEM_RUBRIC + "\n" + "\n".join(lines)
+
+    context = (config.get("context") or "").strip()
+    if context:
+        prompt += "\n\nSEASON CONTEXT (background to interpret references):\n" + context
+
+    return prompt
