@@ -72,11 +72,28 @@ python -m loveisland score --limit 200
 ```
 
 ## Scheduling
-Run it automatically (e.g. every 2 hours) with cron:
-```cron
-0 */2 * * *  cd /path/to/loveisland-sentiment && .venv/bin/python -m loveisland run >> outputs/cron.log 2>&1
+Runs automatically **every 3 hours** via a macOS LaunchAgent (the built-in
+scheduler), which calls `scripts/run_pipeline.py` (collect + score). A template
+plist lives at `scripts/com.loveisland.sentiment.plist`.
+
+```bash
+# Install (one time) — copy the template, edit the paths inside, then load:
+cp scripts/com.loveisland.sentiment.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.loveisland.sentiment.plist
+
+# Useful commands:
+launchctl print gui/$(id -u)/com.loveisland.sentiment   # status
+launchctl kickstart gui/$(id -u)/com.loveisland.sentiment  # run now
+launchctl bootout gui/$(id -u)/com.loveisland.sentiment    # stop/disable
+tail -f outputs/cron.log                                  # watch the log
 ```
-APScheduler is documented as an in-process alternative in the scheduler step.
+
+Change the cadence by editing `StartInterval` (seconds) in the plist, then
+re-load it. It runs while the Mac is awake and you're logged in. A cron line is
+an equivalent alternative:
+```cron
+0 */3 * * *  cd /path/to/loveisland-sentiment && .venv/bin/python scripts/run_pipeline.py
+```
 
 ## Reddit usage (when enabled)
 - **Read-only.** Does not post, comment, vote, message, or take any user or

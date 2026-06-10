@@ -91,8 +91,8 @@ youtube:
     - "Love Island USA season 8 recap"
     - "Love Island USA reaction"
   channels: []                 # optional: specific channel IDs
-  max_videos: 12
-  max_comments_per_video: 100
+  max_videos: 8                # kept modest for the $5 budget; raise anytime
+  max_comments_per_video: 60
 
 # ------------------------------------------------------------
 #  GDELT NEWS — query terms (no API key needed).

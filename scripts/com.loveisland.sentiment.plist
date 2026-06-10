@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.loveisland.sentiment</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/benraeder/Documents/Love Island/loveisland-sentiment/.venv/bin/python</string>
+        <string>/Users/benraeder/Documents/Love Island/loveisland-sentiment/scripts/run_pipeline.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/benraeder/Documents/Love Island/loveisland-sentiment</string>
+
+    <!-- Run every 3 hours (10800 seconds). -->
+    <key>StartInterval</key>
+    <integer>10800</integer>
+
+    <!-- Don't run the moment it's loaded; wait for the first interval. -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- Append all output to a log file (gitignored). -->
+    <key>StandardOutPath</key>
+    <string>/Users/benraeder/Documents/Love Island/loveisland-sentiment/outputs/cron.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/benraeder/Documents/Love Island/loveisland-sentiment/outputs/cron.log</string>
+</dict>
+</plist>
