@@ -120,6 +120,8 @@ def _comment_card(row) -> None:
     text = row["text"][:260] + ("…" if len(row["text"]) > 260 else "")
     st.markdown(f"> {text}")
     meta = []
+    if row.get("entity"):
+        meta.append(f"🏷️ {row['entity']}")
     if "label" in row and pd.notna(row.get("label")):
         meta.append(f"{row['label']} ({row['score']:+.2f})")
     meta.append(str(row.get("source", "")))
@@ -202,12 +204,13 @@ def main() -> None:
     # ---- Vibe check ----
     st.markdown(f"### {vibe_check(avg, loved, crit, disc)}")
 
-    # ---- 🏆 Burn of the Day ----
-    burns = items[(items["funny"] >= 0.45) & (items["sentiment_score"] < -0.05)]
+    # ---- 🏆 Burn of the Day  +  🔥 The Burn Book ----
+    burns = items[(items["funny"] >= 0.4) & (items["sentiment_score"] < 0.0)]
     if burns.empty:
-        burns = items[items["funny"] >= 0.5]
+        burns = items[items["funny"] >= 0.45]
+    burns = burns.sort_values(["funny", "like_count"], ascending=False)
     if not burns.empty:
-        b = burns.sort_values(["funny", "like_count"], ascending=False).iloc[0]
+        b = burns.iloc[0]
         st.subheader("🏆 Burn of the Day")
         with st.container(border=True):
             st.markdown(f"### “{b['text'][:300]}”")
@@ -215,6 +218,12 @@ def main() -> None:
             likes = f" · 👍 {int(b['like_count'])}" if b.get("like_count") else ""
             link = f" · [open]({b['url']})" if str(b.get("url", "")).startswith("http") else ""
             st.caption(f"{tag}{b['source']}{likes}{link}")
+
+        more = burns.iloc[1:9]
+        if not more.empty:
+            with st.expander(f"🔥 The Burn Book — {len(more)} more savage takes", expanded=True):
+                for _, row in more.iterrows():
+                    _comment_card(row)
 
     # ---- Top-line cards ----
     c1, c2, c3, c4 = st.columns(4)
