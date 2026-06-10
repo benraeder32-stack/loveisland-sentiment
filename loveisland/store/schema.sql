@@ -1,0 +1,7 @@
+-- Database schema for the Love Island sentiment tracker.
+--
+-- STATUS: placeholder. The full table definitions (items, aspects,
+-- sentiment_cache) are written in the "store + schema" step.
+--
+-- Types are kept portable so this same schema can migrate to Postgres later
+-- (TEXT timestamps, INTEGER ids, REAL for scores).

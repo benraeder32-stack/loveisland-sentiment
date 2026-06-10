@@ -1,24 +1,98 @@
 # Love Island USA Sentiment Tracker
 
 A personal, non-commercial project that performs read-only sentiment analysis
-of public discussion about the TV show *Love Island USA*.
+of public discussion about the TV show *Love Island USA*. It collects public
+commentary from **sanctioned, API-first sources**, scores sentiment with an LLM,
+stores the results, and surfaces them in a simple dashboard.
 
 ## What it does
-- Collects public posts and comments from sanctioned sources: Reddit (official
-  Data API via PRAW), YouTube (Data API), and news (GDELT).
-- Scores sentiment with an LLM — overall, and by contestant/couple and topic.
-- Stores results in a local database and surfaces them in a personal dashboard.
+- **Collects** public commentary from sanctioned sources:
+  - **YouTube** (Data API) — comments on recap / reaction videos *(v1)*
+  - **News** (GDELT, free, no key) — news coverage *(v1)*
+  - **Reddit** (official Data API via PRAW, read-only) — *stubbed, enabled once access is approved*
+  - **X / Twitter** (official paid API) — *stubbed, for a later version*
+- **Scores** sentiment with an LLM — overall, and by contestant/couple and topic
+  (coupling / drama / game). The rubric is built to handle sarcasm, nicknames,
+  and spoilers.
+- **Stores** results in a local SQLite database (schema written to migrate to
+  Postgres later).
+- **Surfaces** results in a light Streamlit dashboard: top-line sentiment and
+  biggest movers first, then trends over time, by contestant/couple, by source,
+  and volume.
 
-## Reddit usage
+> **Source policy:** API-first, sanctioned sources only. This project never
+> scrapes X/Twitter, Instagram, Facebook, or Reddit web pages.
+
+## How it's organized
+```
+loveisland/
+  collectors/   one module per source (youtube, news, reddit*, x_api*)
+  sentiment/    LLM scoring + the scoring rubric
+  store/        SQLite database + schema
+  dashboard/    Streamlit app
+  config.py     loads config.yaml + .env
+  cli.py        the command menu (collect / score / run / serve)
+config.yaml     YOUR settings: cast roster, keywords, channels, episodes
+.env            YOUR secret keys (never committed; see .env.example)
+```
+`*` = stubbed, ready to switch on later.
+
+## Setup (one time)
+
+**1. Create the project's private toolbox and install its packages**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+**2. Add your keys**
+```bash
+cp .env.example .env
+```
+Then open `.env` in any text editor and paste in your keys:
+- `YOUTUBE_API_KEY` — from the Google Cloud Console
+- `ANTHROPIC_API_KEY` — from https://console.anthropic.com/settings/keys
+
+(GDELT needs no key. Reddit/X keys stay blank until those sources are enabled.)
+
+**3. Fill in the cast**
+Open `config.yaml` and set the `season` number and the `entities` roster
+(contestants and couples, with nicknames). Examples are included in the file.
+
+## Usage
+```bash
+python -m loveisland init-db                 # create the database
+python -m loveisland run                      # collect + score (the usual command)
+python -m loveisland serve                    # open the dashboard
+
+# finer control:
+python -m loveisland collect --since 2026-06-08 --source youtube,news
+python -m loveisland score --limit 200
+```
+
+## Scheduling
+Run it automatically (e.g. every 2 hours) with cron:
+```cron
+0 */2 * * *  cd /path/to/loveisland-sentiment && .venv/bin/python -m loveisland run >> outputs/cron.log 2>&1
+```
+APScheduler is documented as an in-process alternative in the scheduler step.
+
+## Reddit usage (when enabled)
 - **Read-only.** Does not post, comment, vote, message, or take any user or
   moderator action.
 - Targets public subreddit content (r/LoveIslandUSA).
-- Low volume, within free-tier rate limits (100 QPM).
-- API credentials live in a gitignored `.env` and are never committed.
+- Low volume, within free-tier rate limits.
+- App-only ("script") credentials — no username/password. Stored in the
+  gitignored `.env` and never committed.
+
+## Privacy
+Author IDs are hashed before storage (`author_hash`); raw usernames are never
+saved. The local database (`data/`) and any `outputs/` are gitignored.
 
 ## Status
-Early development. Collectors are modular — each data source is a swappable
-module behind a common interface.
+Early development, built step by step. Each data source is a swappable module
+behind a common `Collector` interface.
 
 ## Stack
-Python · PRAW · SQLite · LLM-based sentiment scoring.# loveisland-sentiment
+Python · YouTube Data API · GDELT · PRAW · Anthropic API · SQLite · Streamlit

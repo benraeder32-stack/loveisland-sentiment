@@ -1,0 +1,20 @@
+# Python packages this project needs.
+# Installed automatically into the project's private toolbox (.venv).
+
+# ── Core ───────────────────────────────────────────────────
+pyyaml>=6.0           # reads config.yaml
+python-dotenv>=1.0    # reads the .env secrets file
+requests>=2.31        # talks to web APIs (GDELT news)
+
+# ── Collectors ─────────────────────────────────────────────
+google-api-python-client>=2.100   # YouTube Data API
+praw>=7.7                          # Reddit (read-only; stub until approved)
+
+# ── Sentiment scoring ──────────────────────────────────────
+anthropic>=0.39       # Claude API for scoring sentiment
+# (SQLite database needs no package — it is built into Python)
+
+# ── Dashboard ──────────────────────────────────────────────
+streamlit>=1.30       # the simple web dashboard
+pandas>=2.0,<3.0      # data wrangling for charts
+altair>=5.0           # charts

@@ -1,0 +1,85 @@
+# ============================================================
+#  Love Island USA — Sentiment Tracker settings
+#  ------------------------------------------------------------
+#  This is the ONE file you edit by hand. It is plain text.
+#  Lines beginning with "#" are notes and are ignored.
+#  Keep the indentation (the leading spaces) exactly as shown.
+# ============================================================
+
+show: "Love Island USA"
+season: 0          # <-- FILL IN: the current season number, e.g. 7
+
+# ------------------------------------------------------------
+#  CAST ROSTER  ← the main thing for you to fill in.
+#
+#  canonical : the official name, shown in the dashboard.
+#  aliases   : nicknames / handles fans use, so a comment gets
+#              tagged to the right person even without the full name.
+#
+#  Add one "- canonical:" block per contestant. Copy the example.
+# ------------------------------------------------------------
+entities:
+  contestants:
+    - canonical: "Firstname Lastname"        # <-- example — replace
+      aliases: ["Firstname", "a nickname"]
+    # - canonical: "Another Person"
+    #   aliases: ["nick", "@handle"]
+
+  couples:
+    - canonical: "Name A & Name B"           # <-- example — replace
+      members: ["Name A", "Name B"]
+      aliases: ["their ship name"]
+    # - canonical: "Name C & Name D"
+    #   members: ["Name C", "Name D"]
+    #   aliases: ["shipname"]
+
+# General show keywords used to find and filter relevant content.
+keywords:
+  - "Love Island USA"
+  - "LoveIslandUSA"
+  - "#LoveIslandUSA"
+
+# ------------------------------------------------------------
+#  YOUTUBE — recap / reaction videos to read comments from.
+# ------------------------------------------------------------
+youtube:
+  search_terms:
+    - "Love Island USA recap"
+    - "Love Island USA reaction"
+  channels: []                 # optional: specific channel IDs to pull from
+  max_videos: 15               # videos to scan per run
+  max_comments_per_video: 200
+
+# ------------------------------------------------------------
+#  GDELT NEWS — news-article query terms (no API key needed).
+# ------------------------------------------------------------
+gdelt:
+  query_terms:
+    - "Love Island USA"
+  max_records: 100
+
+# ------------------------------------------------------------
+#  REDDIT — used only once your Reddit API access is approved.
+#  (Stays switched off until then; v1 runs fine without it.)
+# ------------------------------------------------------------
+reddit:
+  subreddits:
+    - "LoveIslandUSA"
+  max_posts: 100
+  max_comments_per_post: 200
+
+# ------------------------------------------------------------
+#  EPISODES — air dates, so comments can be tagged to an episode.
+#  window_hours = how long after airing still counts as that episode.
+# ------------------------------------------------------------
+episodes: []
+  # - number: 1
+  #   air_date: "2026-06-03T21:00:00-04:00"   # date+time WITH timezone
+  #   window_hours: 48
+
+# ------------------------------------------------------------
+#  SENTIMENT scoring settings.
+# ------------------------------------------------------------
+sentiment:
+  model: "claude-haiku-4-5"    # fast + inexpensive; can swap for a stronger model
+  batch_size: 20               # comments scored per API call

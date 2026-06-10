@@ -1,0 +1,30 @@
+# ── Secrets — NEVER commit these ───────────────────────────
+.env
+*.env
+!.env.example
+
+# ── Local database & collected data ────────────────────────
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Generated outputs ──────────────────────────────────────
+outputs/
+
+# ── Python ─────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# ── Virtual environment (the project's private toolbox) ────
+.venv/
+venv/
+
+# ── macOS / editors ────────────────────────────────────────
+.DS_Store
+.vscode/
+.idea/
