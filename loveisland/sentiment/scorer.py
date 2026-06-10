@@ -38,6 +38,7 @@ RESULT_SCHEMA = {
                         "required": ["label", "score"],
                         "additionalProperties": False,
                     },
+                    "funny": {"type": "number"},
                     "aspects": {
                         "type": "array",
                         "items": {
@@ -57,7 +58,7 @@ RESULT_SCHEMA = {
                         },
                     },
                 },
-                "required": ["overall", "aspects"],
+                "required": ["overall", "funny", "aspects"],
                 "additionalProperties": False,
             },
         }
@@ -148,6 +149,7 @@ def _apply(result: dict, item_id: int, valid: Optional[set] = None) -> None:
         item_id,
         overall.get("label", "neutral"),
         float(overall.get("score", 0.0)),
+        float(result.get("funny", 0.0) or 0.0),
     )
     aspects = result.get("aspects", []) or []
     if valid is not None:  # keep only entities that are on the configured roster

@@ -39,6 +39,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
     cols = {row[1] for row in conn.execute("PRAGMA table_info(items)")}
     if "like_count" not in cols:
         conn.execute("ALTER TABLE items ADD COLUMN like_count INTEGER DEFAULT 0")
+    if "funny" not in cols:
+        conn.execute("ALTER TABLE items ADD COLUMN funny REAL DEFAULT 0")
 
 
 # ── Writing collected items ────────────────────────────────────────────
@@ -86,11 +88,12 @@ def fetch_unscored_items(limit: Optional[int] = None, db_path: Path = DB_PATH) -
         return conn.execute(sql, params).fetchall()
 
 
-def save_item_sentiment(item_id: int, label: str, score: float, db_path: Path = DB_PATH) -> None:
+def save_item_sentiment(item_id: int, label: str, score: float, funny: float = 0.0,
+                        db_path: Path = DB_PATH) -> None:
     with connect(db_path) as conn:
         conn.execute(
-            "UPDATE items SET sentiment_label = ?, sentiment_score = ? WHERE id = ?",
-            (label, score, item_id),
+            "UPDATE items SET sentiment_label = ?, sentiment_score = ?, funny = ? WHERE id = ?",
+            (label, score, funny, item_id),
         )
 
 

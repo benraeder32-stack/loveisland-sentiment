@@ -1,23 +1,22 @@
 """Streamlit dashboard — answer-first, and built to make people laugh.
 
 Layout (top to bottom):
-  • Vibe check one-liner
+  • Vibe-check one-liner
+  • 🏆 Burn of the Day (one savage comment, featured)
   • Top-line cards: fan favorite / getting cooked / main character / most divisive
   • 🌡️ Drama-o-meter
-  • 😂 Funniest comments
   • Sentiment over time
-  • By contestant / couple
+  • 😈 Villain Rankings  +  💕 Couple Chemistry Leaderboard
   • 🔍 Spotlight (per person/couple: topics, loved/dragged, funniest takes)
   • By source & volume
 
-Only entities on the configured Season roster are shown anywhere.
+Humor is rated by the LLM (the `funny` field), not emoji counting. Only entities
+on the configured Season roster are shown anywhere.
 
 Run with:  python -m loveisland serve
 """
 
 from __future__ import annotations
-
-import re
 
 try:
     import altair as alt
@@ -38,19 +37,18 @@ from loveisland.store import db  # noqa: E402
 EASTERN = "America/New_York"
 
 
-# ── Data loading (pure functions, testable without Streamlit) ──────────
+# ── Data loading ────────────────────────────────────────────────────────
 
 def load_items() -> "pd.DataFrame":
     with db.connect() as conn:
         df = pd.read_sql_query(
-            "SELECT id, source, episode, entity, entity_type, text, url, "
-            "like_count, created_at, sentiment_label, sentiment_score FROM items",
+            "SELECT id, source, episode, entity, entity_type, text, url, like_count, "
+            "funny, created_at, sentiment_label, sentiment_score FROM items",
             conn,
         )
     if not df.empty:
         df["created_at"] = pd.to_datetime(df["created_at"], utc=True, errors="coerce")
         df["created_et"] = df["created_at"].dt.tz_convert(EASTERN)
-        df["laugh"] = [laugh_score(t, l) for t, l in zip(df["text"], df["like_count"])]
     return df
 
 
@@ -66,57 +64,26 @@ def load_aspects() -> "pd.DataFrame":
 
 def load_entity_comments(entity: str) -> "pd.DataFrame":
     with db.connect() as conn:
-        df = pd.read_sql_query(
-            "SELECT i.text, i.source, i.url, i.like_count, a.topic, "
+        return pd.read_sql_query(
+            "SELECT i.text, i.source, i.url, i.like_count, i.funny, a.topic, "
             "a.sentiment_score AS score, a.sentiment_label AS label "
             "FROM aspects a JOIN items i ON i.id = a.item_id WHERE a.entity = ?",
             conn, params=(entity,),
         )
-    if not df.empty:
-        df["laugh"] = [laugh_score(t, l) for t, l in zip(df["text"], df["like_count"])]
-    return df
 
 
-# ── "Funny" detector — surfaces chuckle-worthy fan reactions ───────────
-
-_LAUGH_EMOJI = "😂🤣💀😭🙃🤡💅😩🙈🫠😅🤪"
-_LAUGH_WORDS = (
-    "lmfaooo", "lmfao", "lmaooo", "lmao", "lol", "rofl", "deceased", "i'm dead", "im dead",
-    "screaming", "crying", "sobbing", "weeping", "cackling", "cackle", "hollering", "wheezing",
-    "i can't", "i cant", "not me", "not him", "not her", "not the", "the way", "bestie",
-    "plsss", "unserious", "chaotic", "icon", "ate that", "slay", "y'all", "yall",
-)
-
-
-def laugh_score(text: str, likes: int = 0) -> float:
-    """Heuristic 'how funny / chaotic is this comment' score."""
-    if not text:
-        return 0.0
-    t = text.lower()
-    s = min(sum(text.count(e) for e in _LAUGH_EMOJI), 5) * 1.5
-    s += 2 * sum(1 for w in _LAUGH_WORDS if w in t)
-    if re.search(r"(.)\1\1", t):            # stretched letters: "lmaooo", "noooo"
-        s += 1.5
-    if re.search(r"\b[A-Z]{4,}\b", text):   # SHOUTING
-        s += 1.0
-    s += min((likes or 0) / 25.0, 4.0)      # popularity boost
-    if len(re.findall(r"[a-zA-Z']{3,}", text)) < 3:   # mostly emoji/timestamps → not a "take"
-        s *= 0.3
-    return s
-
-
-# ── Playful copy generators ────────────────────────────────────────────
+# ── Playful copy ────────────────────────────────────────────────────────
 
 def vibe_check(avg, loved, crit, disc) -> str:
     if crit and loved and avg <= -0.15:
-        return (f"🍿 The villa's in shambles and the group chat is FEASTING — "
-                f"**{crit}** is getting cooked while **{loved}** can do no wrong.")
-    if disc and crit and avg < 0.1:
-        return (f"👀 Tea is brewing. Everyone's yapping about **{disc}**, "
-                f"and the **{crit}** slander is relentless.")
-    if loved and avg >= 0.1:
-        return f"💛 Weirdly wholesome era — **{loved}** has the fans in a full chokehold."
-    return "🌴 Grab a drink — the villa's just getting started."
+        return (f"🔪 It's a bloodbath in the group chat — **{crit}** is getting "
+                f"dragged to filth while **{loved}** walks on water.")
+    if disc and crit and avg < 0.05:
+        return (f"☕ The tea is scalding. **{disc}** is all anyone can talk about, "
+                f"and the **{crit}** slander is a full-time job.")
+    if loved and avg >= 0.05:
+        return f"😌 Rare peace in the villa — **{loved}** has the fans absolutely feral (affectionate)."
+    return "🌴 Pour a drink — the villa's just warming up."
 
 
 def drama_meter(view) -> tuple[float, str, str]:
@@ -124,14 +91,14 @@ def drama_meter(view) -> tuple[float, str, str]:
         return 0.0, "😴 Crickets", "no chatter yet"
     neg = float((view["sentiment_score"] <= -0.15).mean())
     if neg >= 0.50:
-        return neg, "💣 FULL VILLA MELTDOWN", "someone get the producers"
+        return neg, "💣 FULL VILLA MELTDOWN", "somebody call the producers"
     if neg >= 0.38:
-        return neg, "🔥 Drama escalating", "recoupling's about to be messy"
+        return neg, "🔥 Drama escalating", "the recoupling's gonna be a bloodbath"
     if neg >= 0.25:
-        return neg, "👀 Tea is brewing", "side-eyes all around"
+        return neg, "☕ Tea is brewing", "side-eyes for days"
     if neg >= 0.12:
-        return neg, "🙂 Mostly chill", "a little spice, nothing wild"
-    return neg, "☀️ Lovefest", "everyone's coupled up and happy"
+        return neg, "🙂 Mostly chill", "a little messy, nothing wild"
+    return neg, "☀️ Lovefest", "everyone's coupled up and glowing"
 
 
 def _label(score: float) -> str:
@@ -153,8 +120,6 @@ def _comment_card(row) -> None:
     text = row["text"][:260] + ("…" if len(row["text"]) > 260 else "")
     st.markdown(f"> {text}")
     meta = []
-    if row.get("entity"):
-        meta.append(f"🏷️ {row['entity']}")
     if "label" in row and pd.notna(row.get("label")):
         meta.append(f"{row['label']} ({row['score']:+.2f})")
     meta.append(str(row.get("source", "")))
@@ -175,6 +140,16 @@ def _ranked_comments(df, by, ascending) -> None:
         _comment_card(row)
 
 
+def _ranking_bar(df, order: str):
+    return (alt.Chart(df).mark_bar().encode(
+        x=alt.X("avg:Q", title="avg sentiment", scale=alt.Scale(domain=[-1, 1])),
+        y=alt.Y("entity:N", title=None, sort=alt.SortField("avg", order=order)),
+        color=alt.Color("avg:Q", scale=alt.Scale(scheme="redyellowgreen", domain=[-1, 1]),
+                        legend=None),
+        tooltip=["entity", "mentions", alt.Tooltip("avg:Q", format="+.2f")],
+    ).properties(height=max(180, 28 * len(df))))
+
+
 # ── UI ─────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -192,7 +167,7 @@ def main() -> None:
     valid_all = set(contestants) | set(couples)
 
     aspects = load_aspects()
-    if not aspects.empty:  # only show entities on the configured roster
+    if not aspects.empty:
         aspects = aspects[aspects["entity"].isin(valid_all)]
 
     # Sidebar filters
@@ -203,13 +178,14 @@ def main() -> None:
     rule = {"Hour": "1h", "6 hours": "6h", "Day": "1D"}[grain]
     view = scored[scored["source"].isin(picked_sources)] if not scored.empty else scored
 
-    # Compute the headline entities (roster-only)
+    # Headline entities (roster-only)
     loved = crit = disc = divisive = None
+    by_entity = pd.DataFrame()
     if not aspects.empty:
-        be = (aspects.groupby(["entity", "entity_type"])
-              .agg(mentions=("sentiment_score", "size"), avg=("sentiment_score", "mean"))
-              .reset_index())
-        ranked = be[be["mentions"] >= 2]
+        by_entity = (aspects.groupby(["entity", "entity_type"])
+                     .agg(mentions=("sentiment_score", "size"), avg=("sentiment_score", "mean"))
+                     .reset_index())
+        ranked = by_entity[by_entity["mentions"] >= 2]
         if not ranked.empty:
             loved = ranked.sort_values("avg", ascending=False).iloc[0]["entity"]
             crit = ranked.sort_values("avg").iloc[0]["entity"]
@@ -225,6 +201,20 @@ def main() -> None:
 
     # ---- Vibe check ----
     st.markdown(f"### {vibe_check(avg, loved, crit, disc)}")
+
+    # ---- 🏆 Burn of the Day ----
+    burns = items[(items["funny"] >= 0.45) & (items["sentiment_score"] < -0.05)]
+    if burns.empty:
+        burns = items[items["funny"] >= 0.5]
+    if not burns.empty:
+        b = burns.sort_values(["funny", "like_count"], ascending=False).iloc[0]
+        st.subheader("🏆 Burn of the Day")
+        with st.container(border=True):
+            st.markdown(f"### “{b['text'][:300]}”")
+            tag = f"🏷️ {b['entity']} · " if b.get("entity") else ""
+            likes = f" · 👍 {int(b['like_count'])}" if b.get("like_count") else ""
+            link = f" · [open]({b['url']})" if str(b.get("url", "")).startswith("http") else ""
+            st.caption(f"{tag}{b['source']}{likes}{link}")
 
     # ---- Top-line cards ----
     c1, c2, c3, c4 = st.columns(4)
@@ -246,15 +236,6 @@ def main() -> None:
     st.progress(min(1.0, lvl + 0.05))
     st.markdown(f"**{label}** — _{sub}_")
 
-    # ---- Funniest comments ----
-    st.subheader("😂 Funniest comments right now")
-    funny = items[items["laugh"] > 2].sort_values(["laugh", "like_count"], ascending=False).head(8)
-    if funny.empty:
-        st.caption("Nothing chaotic enough yet — give it a few runs. 🍿")
-    else:
-        for _, row in funny.iterrows():
-            _comment_card(row)
-
     # ---- Sentiment over time ----
     st.subheader("Sentiment over time")
     if view.empty:
@@ -271,28 +252,27 @@ def main() -> None:
             zero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color="gray").encode(y="y")
             st.altair_chart(zero + line, use_container_width=True)
 
-    # ---- By contestant / couple ----
-    st.subheader("By contestant / couple")
-    if aspects.empty:
-        st.caption("No per-person sentiment yet — score some comments first.")
-    else:
-        kind = st.radio("Show", ["Contestants", "Couples"], horizontal=True, key="overview_kind")
-        want = "contestant" if kind == "Contestants" else "couple"
-        sub_a = aspects[aspects["entity_type"] == want]
-        if sub_a.empty:
-            st.caption(f"No {kind.lower()} mentions yet.")
-        else:
-            agg = (sub_a.groupby("entity")
-                   .agg(mentions=("sentiment_score", "size"), avg=("sentiment_score", "mean"))
-                   .reset_index().sort_values("mentions", ascending=False))
-            bar = (alt.Chart(agg).mark_bar().encode(
-                x=alt.X("avg:Q", title="Avg sentiment", scale=alt.Scale(domain=[-1, 1])),
-                y=alt.Y("entity:N", sort="-x", title=None),
-                color=alt.Color("avg:Q", scale=alt.Scale(scheme="redyellowgreen", domain=[-1, 1]),
-                                legend=None),
-                tooltip=["entity", "mentions", alt.Tooltip("avg:Q", format="+.2f")],
-            ).properties(height=max(220, 26 * len(agg))))
-            st.altair_chart(bar, use_container_width=True)
+    # ---- Villain rankings + couple chemistry ----
+    if not by_entity.empty:
+        col_v, col_c = st.columns(2)
+        with col_v:
+            st.subheader("😈 Villain Rankings")
+            st.caption("contestants the fans love to hate (most negative)")
+            vil = (by_entity[(by_entity["entity_type"] == "contestant") & (by_entity["mentions"] >= 2)]
+                   .sort_values("avg").head(8))
+            if vil.empty:
+                st.caption("Not enough mentions yet.")
+            else:
+                st.altair_chart(_ranking_bar(vil, "ascending"), use_container_width=True)
+        with col_c:
+            st.subheader("💕 Couple Chemistry")
+            st.caption("ships ranked by the fans (best vibes on top)")
+            chem = (by_entity[by_entity["entity_type"] == "couple"]
+                    .sort_values("avg", ascending=False).head(8))
+            if chem.empty:
+                st.caption("No couple mentions yet.")
+            else:
+                st.altair_chart(_ranking_bar(chem, "descending"), use_container_width=True)
 
     # ---- Spotlight ----
     st.subheader("🔍 Spotlight — zoom in on one person or couple")
@@ -335,10 +315,10 @@ def main() -> None:
                 st.markdown(f"**🔥 Most dragged about {pick}**")
                 _ranked_comments(ent_comments, "score", ascending=True)
 
-            funny_e = ent_comments[ent_comments["laugh"] > 1.5]
+            funny_e = ent_comments[ent_comments["funny"] >= 0.4]
             if not funny_e.empty:
                 st.markdown(f"**😂 Funniest takes on {pick}**")
-                _ranked_comments(funny_e, "laugh", ascending=False)
+                _ranked_comments(funny_e, "funny", ascending=False)
 
     # ---- By source & volume ----
     left, right = st.columns(2)

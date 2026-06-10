@@ -30,6 +30,14 @@ each. For every contestant or couple clearly referenced, emit:
   - label: "positive" | "neutral" | "negative" | "mixed"
   - score: -1.0 .. +1.0
 
+FUNNY (0.0–1.0): how genuinely funny, witty, or savagely entertaining the
+comment is — a clever drag, a brutal one-liner, an unhinged but hilarious stan
+reaction, a sharp observation. Be a TOUGH judge:
+  - Laughing emoji, "lol/lmao", or ALL CAPS on their OWN are NOT funny → near 0.0.
+  - Most comments are bland: 0.0–0.2.
+  - Reward actual wit and savagery: a comment that would make a fan group chat
+    laugh or gasp scores 0.7+. Reserve 0.9+ for genuinely great burns.
+
 CRITICAL READING RULES:
 1. SARCASM & irony: judge the INTENDED meaning, not the literal words.
    "oh GREAT, another meltdown 🙄" is negative despite the word "great".

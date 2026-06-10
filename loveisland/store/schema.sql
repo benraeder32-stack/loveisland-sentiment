@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS items (
     collected_at    TEXT    NOT NULL,   -- when we fetched it (ISO-8601 UTC)
     sentiment_label TEXT,               -- positive|neutral|negative|mixed (nullable)
     sentiment_score REAL,               -- -1.0 .. +1.0 (nullable)
+    funny           REAL DEFAULT 0,     -- 0.0 .. 1.0 how funny/savage (LLM-rated)
     UNIQUE (source, external_id)        -- makes re-collection idempotent
 );
 
