@@ -13,8 +13,12 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+import warnings
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# Quiet Google's "Python 3.9 is old" notices — harmless, just noisy.
+warnings.filterwarnings("ignore", category=FutureWarning, module=r"google\..*")
 
 from . import __version__, pipeline
 from .config import ROOT, load_config
