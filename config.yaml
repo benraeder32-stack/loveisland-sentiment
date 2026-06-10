@@ -111,7 +111,7 @@ bluesky:
   queries:
     - "love island usa"
     - "#loveislandusa"
-  max_per_query: 200
+  max_per_query: 100        # per run; raise for more coverage (more scoring cost)
 
 # ------------------------------------------------------------
 #  TUMBLR — posts under these tags (needs TUMBLR_API_KEY in .env).
@@ -121,7 +121,7 @@ tumblr:
   tags:
     - "love island usa"
     - "loveislandusa"
-  max_per_tag: 200
+  max_per_tag: 100          # per run; raise for more coverage (more scoring cost)
 
 # ------------------------------------------------------------
 #  REDDIT — used only once your Reddit API access is approved.
