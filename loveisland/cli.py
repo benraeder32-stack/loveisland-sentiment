@@ -91,11 +91,12 @@ def cmd_run(args: argparse.Namespace) -> None:
 
 def cmd_serve(args: argparse.Namespace) -> None:
     app = ROOT / "loveisland" / "dashboard" / "app.py"
-    print("🚀 Launching dashboard (press Ctrl+C to stop)…")
+    print("🚀 Launching dashboard at http://localhost:8501 (press Ctrl+C to stop)…")
     try:
-        subprocess.run(["streamlit", "run", str(app)], check=True)
+        # Use the current interpreter's streamlit so it works inside the venv.
+        subprocess.run([sys.executable, "-m", "streamlit", "run", str(app)], check=True)
     except FileNotFoundError:
-        print("Streamlit is not installed yet. It is added in the dashboard step.")
+        print("Streamlit is not installed. Run:  pip install -r requirements.txt")
 
 
 def build_parser() -> argparse.ArgumentParser:
