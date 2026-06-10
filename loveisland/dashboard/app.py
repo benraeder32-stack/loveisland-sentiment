@@ -54,12 +54,16 @@ def load_items() -> "pd.DataFrame":
 
 def load_aspects() -> "pd.DataFrame":
     with db.connect() as conn:
-        return pd.read_sql_query(
+        df = pd.read_sql_query(
             "SELECT a.entity, a.entity_type, a.topic, a.sentiment_label, "
             "a.sentiment_score, i.created_at FROM aspects a "
             "JOIN items i ON i.id = a.item_id",
             conn,
         )
+    if not df.empty:
+        df["created_at"] = pd.to_datetime(df["created_at"], utc=True, errors="coerce")
+        df["created_et"] = df["created_at"].dt.tz_convert(EASTERN)
+    return df
 
 
 def load_entity_comments(entity: str) -> "pd.DataFrame":
@@ -205,9 +209,10 @@ def main() -> None:
     st.markdown(f"### {vibe_check(avg, loved, crit, disc)}")
 
     # ---- 🏆 Burn of the Day  +  🔥 The Burn Book ----
-    burns = items[(items["funny"] >= 0.4) & (items["sentiment_score"] < 0.0)]
-    if burns.empty:
-        burns = items[items["funny"] >= 0.45]
+    # Spicy first: only genuinely brutal takes (very funny AND clearly negative).
+    burns = items[(items["funny"] >= 0.6) & (items["sentiment_score"] <= -0.2)]
+    if len(burns) < 3:  # fallback so the Burn Book is never empty
+        burns = items[(items["funny"] >= 0.45) & (items["sentiment_score"] < 0.0)]
     burns = burns.sort_values(["funny", "like_count"], ascending=False)
     if not burns.empty:
         b = burns.iloc[0]
@@ -301,6 +306,21 @@ def main() -> None:
             b.metric("Avg sentiment", f"{sc:+.2f}", _label(sc))
             mode = asp["topic"].mode()
             c.metric("Top topic", mode.iloc[0] if not mode.empty else "—")
+
+            # Per-entity sentiment over time
+            ets = (asp.dropna(subset=["created_et"]).set_index("created_et")
+                   .resample(rule)["sentiment_score"].mean().reset_index().dropna())
+            st.markdown(f"**📈 {pick}'s sentiment over time**")
+            if len(ets) >= 2:
+                eline = (alt.Chart(ets).mark_line(point=True).encode(
+                    x=alt.X("created_et:T", title="Time (ET)"),
+                    y=alt.Y("sentiment_score:Q", title="Avg sentiment", scale=alt.Scale(domain=[-1, 1])),
+                    tooltip=["created_et:T", alt.Tooltip("sentiment_score:Q", format="+.2f")],
+                ).properties(height=220))
+                ezero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color="gray").encode(y="y")
+                st.altair_chart(ezero + eline, use_container_width=True)
+            else:
+                st.caption("Not enough history yet — fills in as more comments arrive over the season.")
 
             topics = (asp.dropna(subset=["topic"]).groupby("topic")
                       .agg(mentions=("sentiment_score", "size"), avg=("sentiment_score", "mean"))
