@@ -31,6 +31,14 @@ def init_db(db_path: Path = DB_PATH) -> None:
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     with connect(db_path) as conn:
         conn.executescript(schema)
+        _migrate(conn)
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Apply additive schema changes to an existing database (idempotent)."""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(items)")}
+    if "like_count" not in cols:
+        conn.execute("ALTER TABLE items ADD COLUMN like_count INTEGER DEFAULT 0")
 
 
 # ── Writing collected items ────────────────────────────────────────────
@@ -50,14 +58,14 @@ def upsert_items(records: list[NormalizedRecord], db_path: Path = DB_PATH) -> in
                 INSERT OR IGNORE INTO items (
                     source, external_id, show, season, episode,
                     entity, entity_type, author_hash, text, text_hash,
-                    lang, url, created_at, collected_at,
+                    lang, url, like_count, created_at, collected_at,
                     sentiment_label, sentiment_score
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     r.source, r.external_id, r.show, r.season, r.episode,
                     r.entity, r.entity_type, r.author_hash, r.text, r.text_hash,
-                    r.lang, r.url, r.created_at, r.collected_at,
+                    r.lang, r.url, r.like_count, r.created_at, r.collected_at,
                     r.sentiment_label, r.sentiment_score,
                 ),
             )

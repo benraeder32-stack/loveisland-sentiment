@@ -46,6 +46,7 @@ class NormalizedRecord:
     entity_type: Optional[str] = None  # "contestant" | "couple"
     lang: Optional[str] = None
     text_hash: Optional[str] = None    # for de-duping + sentiment caching
+    like_count: int = 0                # engagement (YouTube likes); 0 if n/a
 
     # Filled in later by the sentiment module:
     sentiment_label: Optional[str] = None   # positive | neutral | negative | mixed

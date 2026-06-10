@@ -91,6 +91,14 @@ def score_batch(client, model: str, system_prompt: str, texts: list[str]) -> lis
     return json.loads(text).get("results", [])
 
 
+def roster_names(config: Config) -> set:
+    """The exact canonical contestant + couple names from config.yaml."""
+    ent = config.get("entities", {}) or {}
+    names = {p.get("canonical") for p in (ent.get("contestants") or []) if p.get("canonical")}
+    names |= {c.get("canonical") for c in (ent.get("couples") or []) if c.get("canonical")}
+    return names
+
+
 def score_unscored(config: Config, limit: Optional[int] = None,
                    model: Optional[str] = None) -> int:
     """Score every stored item that has no sentiment yet. Returns the count scored."""
@@ -102,6 +110,7 @@ def score_unscored(config: Config, limit: Optional[int] = None,
     model = model or sentiment_cfg.get("model") or DEFAULT_MODEL
     batch_size = int(sentiment_cfg.get("batch_size", 20))
     system_prompt = build_system_prompt(config)
+    valid = roster_names(config)
     client = _client()
     now = datetime.now(timezone.utc).isoformat()
 
@@ -111,7 +120,7 @@ def score_unscored(config: Config, limit: Optional[int] = None,
     for row in rows:
         cached = db.cache_get(row["text_hash"])
         if cached:
-            _apply(json.loads(cached), row["id"])
+            _apply(json.loads(cached), row["id"], valid)
             scored += 1
         else:
             to_score.append(row)
@@ -125,7 +134,7 @@ def score_unscored(config: Config, limit: Optional[int] = None,
             print(f"    (scoring batch failed: {exc}; will retry next run)")
             continue
         for row, result in zip(batch, results):
-            _apply(result, row["id"])
+            _apply(result, row["id"], valid)
             db.cache_put(row["text_hash"], model, json.dumps(result), now)
             scored += 1
         print(f"    scored {min(start + batch_size, len(to_score))}/{len(to_score)} new")
@@ -133,11 +142,14 @@ def score_unscored(config: Config, limit: Optional[int] = None,
     return scored
 
 
-def _apply(result: dict, item_id: int) -> None:
+def _apply(result: dict, item_id: int, valid: Optional[set] = None) -> None:
     overall = result.get("overall", {}) or {}
     db.save_item_sentiment(
         item_id,
         overall.get("label", "neutral"),
         float(overall.get("score", 0.0)),
     )
-    db.replace_aspects(item_id, result.get("aspects", []) or [])
+    aspects = result.get("aspects", []) or []
+    if valid is not None:  # keep only entities that are on the configured roster
+        aspects = [a for a in aspects if a.get("entity") in valid]
+    db.replace_aspects(item_id, aspects)

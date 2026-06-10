@@ -63,6 +63,7 @@ def normalize_items(raw_items: list[RawItem], config: Config) -> list[Normalized
                 entity=entity,
                 entity_type=entity_type,
                 text_hash=_hash_text(text),
+                like_count=int(item.raw.get("like_count", 0) or 0),
             )
         )
     return records

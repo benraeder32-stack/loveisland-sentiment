@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS items (
     text_hash       TEXT    NOT NULL,   -- for de-dupe + sentiment caching
     lang            TEXT,
     url             TEXT,
+    like_count      INTEGER DEFAULT 0,  -- engagement (e.g. YouTube likes)
     created_at      TEXT    NOT NULL,   -- when posted (ISO-8601 UTC)
     collected_at    TEXT    NOT NULL,   -- when we fetched it (ISO-8601 UTC)
     sentiment_label TEXT,               -- positive|neutral|negative|mixed (nullable)
