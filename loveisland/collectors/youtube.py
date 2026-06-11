@@ -11,7 +11,7 @@ display name is never stored.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from .base import Collector
 from ..config import get_secret
@@ -60,13 +60,18 @@ class YouTubeCollector(Collector):
     def _find_videos(self, youtube, search_terms, channels, max_videos) -> list[str]:
         ids: list[str] = []
         seen: set[str] = set()
+        # Keep results to the current season, and prefer POPULAR videos (which
+        # have far more comments) over merely the newest uploads.
+        published_after = (
+            datetime.now(timezone.utc) - timedelta(days=45)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        def add_search(**params):
+        def add_search(order, **params):
             if len(ids) >= max_videos:
                 return
             resp = youtube.search().list(
-                part="id", type="video", order="date",
-                maxResults=min(50, max_videos), **params,
+                part="id", type="video", order=order, maxResults=50,
+                publishedAfter=published_after, **params,
             ).execute()
             for item in resp.get("items", []):
                 vid = item["id"].get("videoId")
@@ -75,9 +80,11 @@ class YouTubeCollector(Collector):
                     ids.append(vid)
 
         for term in search_terms:
-            add_search(q=term)
+            add_search("viewCount", q=term)   # biggest videos = most comments
+            add_search("relevance", q=term)   # canonical recap/reaction videos
+            add_search("date", q=term)        # newest uploads = fresh reactions
         for channel_id in channels:
-            add_search(channelId=channel_id)
+            add_search("date", channelId=channel_id)
         return ids[:max_videos]
 
     def _fetch_comments(self, youtube, video_id, since, max_comments) -> list[RawItem]:

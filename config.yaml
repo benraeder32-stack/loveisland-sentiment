@@ -87,14 +87,12 @@ keywords:
 #  you're comfortable. (Re-runs skip already-seen comments.)
 # ------------------------------------------------------------
 youtube:
-  search_terms:
+  search_terms:                # kept to 2 (each searched 3 ways) for quota
     - "Love Island USA season 8 recap"
     - "Love Island USA reaction"
-    - "Love Island USA season 8"
-    - "Love Island USA episode recap"
   channels: []                 # optional: specific channel IDs
   max_videos: 40               # MAX firehose
-  max_comments_per_video: 300
+  max_comments_per_video: 500
 
 # ------------------------------------------------------------
 #  GDELT NEWS — query terms (no API key needed).
