@@ -21,7 +21,15 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches, Pt
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import pandas as pd
+
 from loveisland.store import db
+
+CHARTS = Path(__file__).resolve().parent.parent / "outputs" / "_charts"
 
 # ── Palette (Love Island after-dark) ──────────────────────────────────
 BG    = RGBColor(0x11, 0x0D, 0x22)
@@ -54,6 +62,7 @@ def fetch():
     d["faves"] = q("SELECT entity, COUNT(*) n, AVG(sentiment_score) a FROM aspects WHERE entity_type='contestant' GROUP BY entity HAVING n>=5 ORDER BY a DESC LIMIT 5")
     d["villains"] = q("SELECT entity, COUNT(*) n, AVG(sentiment_score) a FROM aspects WHERE entity_type='contestant' GROUP BY entity HAVING n>=5 ORDER BY a ASC LIMIT 5")
     d["report"] = q("SELECT entity, COUNT(*) n, AVG(sentiment_score) a FROM aspects WHERE entity_type='contestant' GROUP BY entity HAVING n>=5 ORDER BY a DESC LIMIT 15")
+    d["all_contestants"] = q("SELECT entity, COUNT(*) n, AVG(sentiment_score) a FROM aspects WHERE entity_type='contestant' GROUP BY entity HAVING n>=5 ORDER BY n DESC")
     d["couples"] = q("SELECT entity, COUNT(*) n, AVG(sentiment_score) a FROM aspects WHERE entity_type='couple' GROUP BY entity HAVING n>=3 ORDER BY a DESC")
     d["burns"] = q("SELECT text, source FROM items WHERE funny>=0.5 AND sentiment_score<=-0.2 ORDER BY funny DESC, like_count DESC LIMIT 6")
     d["funny"] = q("SELECT text, source FROM items WHERE funny>=0.5 AND sentiment_score>-0.2 ORDER BY funny DESC, like_count DESC LIMIT 6")
@@ -132,6 +141,86 @@ def quotes_grid(s, rows):
         text(s, l + 0.3, t + 1.26, 5.32, 0.28, f"via {src}", 10.5, GOLD)
 
 
+# ── Trend charts + deep dives ───────────────────────────────────────────
+
+def _series(rows):
+    if not rows:
+        return None
+    df = pd.DataFrame(rows, columns=["t", "s"])
+    df["t"] = pd.to_datetime(df["t"], utc=True, errors="coerce")
+    ser = df.dropna(subset=["t"]).set_index("t").resample("1D")["s"].mean().dropna()
+    return ser if len(ser) >= 2 else None
+
+
+def overall_series():
+    rows = db.connect().execute(
+        "SELECT created_at, sentiment_score FROM items WHERE sentiment_score IS NOT NULL").fetchall()
+    return _series(rows)
+
+
+def entity_series(entity):
+    rows = db.connect().execute(
+        "SELECT i.created_at, a.sentiment_score FROM aspects a JOIN items i ON i.id=a.item_id "
+        "WHERE a.entity=?", (entity,)).fetchall()
+    return _series(rows)
+
+
+def trend_png(ser, color_hex, name, h_in=2.5):
+    CHARTS.mkdir(parents=True, exist_ok=True)
+    path = CHARTS / (re.sub(r"[^A-Za-z0-9]+", "_", name) + ".png")
+    fig, ax = plt.subplots(figsize=(11.9, h_in), dpi=150)
+    fig.patch.set_alpha(0); ax.set_facecolor("none")
+    ax.axhline(0, color="#5A4F73", lw=1.2)
+    ax.fill_between(ser.index, ser.values, 0, color="#" + color_hex, alpha=0.13)
+    ax.plot(ser.index, ser.values, color="#" + color_hex, lw=3.4, marker="o", ms=6,
+            mfc="#" + color_hex, mec="white", mew=0.6)
+    ax.set_ylim(-1, 1); ax.set_yticks([-1, -0.5, 0, 0.5, 1])
+    loc = mdates.AutoDateLocator()
+    ax.xaxis.set_major_locator(loc)
+    ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(loc))
+    ax.tick_params(colors="#9E8FB8", labelsize=10)
+    for sp in ("top", "right"): ax.spines[sp].set_visible(False)
+    for sp in ("left", "bottom"): ax.spines[sp].set_color("#5A4F73")
+    ax.grid(axis="y", color="#2A1F47", lw=0.9)
+    fig.tight_layout(pad=0.5)
+    fig.savefig(path, transparent=True); plt.close(fig)
+    return str(path)
+
+
+def deep_dive(prs, name, kind, n, a):
+    s = slide(prs)
+    gl, gc = grade(a)
+    text(s, 0.62, 0.42, 10.0, 0.4, f"APPENDIX · {kind} DEEP DIVE", 13, GOLD)
+    text(s, 0.6, 0.76, 10.0, 0.9, name.upper(), 33, WHITE, font=HEAD)
+    text(s, 0.62, 1.56, 10.0, 0.4, f"{n:,} mentions   ·   avg sentiment {a:+.2f}", 14, MUTE, bold=False)
+    card(s, 11.35, 0.5, 1.45, 1.45, CARD)
+    text(s, 11.35, 0.5, 1.45, 1.45, gl, 58, gc, font=HEAD, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+
+    text(s, 0.62, 2.02, 11.9, 0.32, "SENTIMENT OVER TIME", 13, MUTE)
+    ser = entity_series(name)
+    if ser is not None:
+        png = trend_png(ser, "36E27B" if a >= 0 else "FF5C5C", name, 2.4)
+        s.shapes.add_picture(png, Inches(0.7), Inches(2.36), Inches(11.9), Inches(2.5))
+    else:
+        card(s, 0.7, 2.4, 11.9, 2.4, CARD)
+        text(s, 0.7, 3.35, 11.9, 0.6, "Not enough history yet for a trend line — fills in over the season.",
+             16, MUTE, bold=False, align=PP_ALIGN.CENTER)
+
+    c = db.connect()
+    sql = ("SELECT i.text, i.source FROM aspects a JOIN items i ON i.id=a.item_id "
+           "WHERE a.entity=? ORDER BY a.sentiment_score {}, i.like_count DESC LIMIT 1")
+    loved = c.execute(sql.format("DESC"), (name,)).fetchone()
+    dragged = c.execute(sql.format("ASC"), (name,)).fetchone()
+    for l, head, hc, row in [(0.6, "💖 BEST TAKE", GREEN, loved), (6.85, "🔥 WORST TAKE", RED, dragged)]:
+        card(s, l, 5.1, 5.88, 2.0, CARD)
+        text(s, l + 0.3, 5.26, 5.3, 0.32, head, 12, hc)
+        if row:
+            text(s, l + 0.3, 5.64, 5.3, 1.1, clean(row[0], 135), 13.5, WHITE, bold=False, spacing=1.04)
+            text(s, l + 0.3, 6.76, 5.3, 0.28, f"via {row[1]}", 10.5, GOLD)
+        else:
+            text(s, l + 0.3, 5.7, 5.3, 0.5, "—", 14, MUTE, bold=False)
+
+
 # ── Build ────────────────────────────────────────────────────────────────
 
 def build(d):
@@ -167,7 +256,22 @@ def build(d):
     text(s, 1.1, 4.78, 11.2, 1.0, mood, 46, PINK, font=HEAD)
     text(s, 1.1, 5.85, 11.2, 0.7, f"{d['pos']*100:.0f}% feeling good  ·  {d['neg']*100:.0f}% absolutely seething  ·  the internet is FEASTING.", 17, WHITE, bold=False)
 
-    # 3 — Main Characters
+    # 3 — The Mood Swing (overall sentiment over time)
+    s = slide(prs)
+    title(s, "how the villa's mood has swung all season", "The Mood Swing 📈")
+    ser = overall_series()
+    if ser is not None:
+        png = trend_png(ser, "FF2E88", "_overall", 3.1)
+        s.shapes.add_picture(png, Inches(0.7), Inches(2.1), Inches(11.9), Inches(3.25))
+        cur, lo, hi = ser.iloc[-1], ser.min(), ser.max()
+        vibe = "happy" if cur >= 0.1 else ("rough" if cur <= -0.1 else "split down the middle")
+        text(s, 0.7, 5.65, 11.9, 0.9,
+             f"Right now the villa is {vibe} ({cur:+.2f}). It's swung from {lo:+.2f} to {hi:+.2f} this season — a total rollercoaster.",
+             16, WHITE, bold=False)
+    else:
+        text(s, 0.7, 3.3, 11.9, 0.6, "Not enough history yet — fills in as the season goes.", 18, MUTE, bold=False)
+
+    # 4 — Main Characters
     s = slide(prs)
     title(s, "who the internet can't shut up about", "Main Characters")
     text(s, 0.62, 1.72, 12.1, 0.5, f"{d['discussed'][0][0]} is living rent-free in everyone's head.", 16, GOLD, bold=False)
@@ -275,6 +379,16 @@ def build(d):
     text(s, 1.0, 5.2, 11.3, 0.7, "Now stop reading and go watch. 🍷📺", 26, GOLD, font=HEAD, align=PP_ALIGN.CENTER)
     text(s, 1.0, 6.1, 11.3, 0.5, f"Data as of {span_hi} · {d['total']:,} comments analyzed · the people have spoken", 12, MUTE, bold=False, align=PP_ALIGN.CENTER)
 
+    # ── APPENDIX: deep dive per contestant + couple ──────────────────────
+    s = slide(prs)
+    card(s, 0, 3.5, 13.333, 0.16, PINK)
+    text(s, 0.7, 2.45, 11.9, 1.1, "APPENDIX", 62, PINK, font=HEAD, align=PP_ALIGN.CENTER)
+    text(s, 0.7, 3.8, 11.9, 0.6, "every contestant & couple, deep-dived 🔬", 20, MUTE, align=PP_ALIGN.CENTER, bold=False)
+    for name, n, a in d["all_contestants"]:
+        deep_dive(prs, name, "CONTESTANT", n, a)
+    for name, n, a in d["couples"]:
+        deep_dive(prs, name, "COUPLE", n, a)
+
     return prs
 
 
@@ -282,5 +396,6 @@ if __name__ == "__main__":
     data = fetch()
     out = Path(__file__).resolve().parent.parent / "outputs" / "love_island_report.pptx"
     out.parent.mkdir(exist_ok=True)
-    build(data).save(out)
-    print(f"✅ Saved {out}  ({data['total']:,} comments, 12 slides)")
+    prs = build(data)
+    prs.save(out)
+    print(f"✅ Saved {out}  ({data['total']:,} comments, {len(prs.slides)} slides)")
