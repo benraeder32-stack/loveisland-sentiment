@@ -8,6 +8,7 @@ Output: outputs/love_island_report.pptx
 
 from __future__ import annotations
 
+import math
 import re
 import sys
 from datetime import datetime
@@ -64,14 +65,20 @@ def fetch():
     d["report"] = q("SELECT entity, COUNT(*) n, AVG(sentiment_score) a FROM aspects WHERE entity_type='contestant' GROUP BY entity HAVING n>=5 ORDER BY a DESC LIMIT 15")
     d["all_contestants"] = q("SELECT entity, COUNT(*) n, AVG(sentiment_score) a FROM aspects WHERE entity_type='contestant' GROUP BY entity HAVING n>=5 ORDER BY n DESC")
     d["couples"] = q("SELECT entity, COUNT(*) n, AVG(sentiment_score) a FROM aspects WHERE entity_type='couple' GROUP BY entity HAVING n>=3 ORDER BY a DESC")
-    d["burns"] = q("SELECT text, source FROM items WHERE funny>=0.5 AND sentiment_score<=-0.2 ORDER BY funny DESC, like_count DESC LIMIT 6")
-    d["funny"] = q("SELECT text, source FROM items WHERE funny>=0.5 AND sentiment_score>-0.2 ORDER BY funny DESC, like_count DESC LIMIT 6")
+    d["burns"] = q("SELECT text, source FROM items WHERE funny>=0.5 AND sentiment_score<=-0.2 AND LENGTH(text) BETWEEN 25 AND 210 ORDER BY funny DESC, like_count DESC LIMIT 6")
+    d["funny"] = q("SELECT text, source FROM items WHERE funny>=0.5 AND sentiment_score>-0.2 AND LENGTH(text) BETWEEN 25 AND 210 ORDER BY funny DESC, like_count DESC LIMIT 6")
     return d
 
 
-def clean(t, n=125):
+def clean(t, n=300):
     t = re.sub(r"\s+", " ", (t or "").strip())
     return (t[:n].rstrip() + "…") if len(t) > n else t
+
+
+def fit_size(txt, w, h, lo, hi):
+    """Largest font (pt) in [lo, hi] that fits `txt` in a w x h inch area."""
+    pt = math.sqrt(7000 * w * h / max(1, len(txt)))
+    return round(max(lo, min(hi, pt)), 1)
 
 
 def grade(a):
@@ -132,13 +139,14 @@ def ranking(s, rows, top, color_fn, denom=0.4):
 
 
 def quotes_grid(s, rows):
-    """6 quote cards, 2 columns x 3 rows."""
-    pos = [(0.6, 1.9), (6.85, 1.9), (0.6, 3.68), (6.85, 3.68), (0.6, 5.46), (6.85, 5.46)]
+    """6 quote cards, 2 columns x 3 rows; full quotes, auto-sized to fit."""
+    pos = [(0.6, 1.85), (6.85, 1.85), (0.6, 3.72), (6.85, 3.72), (0.6, 5.59), (6.85, 5.59)]
     for (l, t), (txt, src) in zip(pos, rows):
-        card(s, l, t, 5.88, 1.62)
-        text(s, l + 0.28, t + 0.12, 0.6, 0.4, "“", 30, PINK, font=HEAD)
-        text(s, l + 0.3, t + 0.46, 5.32, 0.78, clean(txt, 118), 13, WHITE, bold=False, spacing=1.03)
-        text(s, l + 0.3, t + 1.26, 5.32, 0.28, f"via {src}", 10.5, GOLD)
+        card(s, l, t, 5.88, 1.7)
+        text(s, l + 0.28, t + 0.1, 0.6, 0.4, "“", 28, PINK, font=HEAD)
+        q = clean(txt)
+        text(s, l + 0.3, t + 0.42, 5.32, 0.96, q, fit_size(q, 5.0, 0.95, 10.5, 14), WHITE, bold=False, spacing=1.03)
+        text(s, l + 0.3, t + 1.4, 5.32, 0.26, f"via {src}", 10.5, GOLD)
 
 
 # ── Trend charts + deep dives ───────────────────────────────────────────
@@ -207,16 +215,20 @@ def deep_dive(prs, name, kind, n, a):
              16, MUTE, bold=False, align=PP_ALIGN.CENTER)
 
     c = db.connect()
-    sql = ("SELECT i.text, i.source FROM aspects a JOIN items i ON i.id=a.item_id "
-           "WHERE a.entity=? ORDER BY a.sentiment_score {}, i.like_count DESC LIMIT 1")
-    loved = c.execute(sql.format("DESC"), (name,)).fetchone()
-    dragged = c.execute(sql.format("ASC"), (name,)).fetchone()
+    fit = ("SELECT i.text, i.source FROM aspects a JOIN items i ON i.id=a.item_id "
+           "WHERE a.entity=? AND LENGTH(i.text) BETWEEN 25 AND 260 "
+           "ORDER BY a.sentiment_score {d}, i.like_count DESC LIMIT 1")
+    anyq = ("SELECT i.text, i.source FROM aspects a JOIN items i ON i.id=a.item_id "
+            "WHERE a.entity=? ORDER BY a.sentiment_score {d}, i.like_count DESC LIMIT 1")
+    pick = lambda dr: c.execute(fit.format(d=dr), (name,)).fetchone() or c.execute(anyq.format(d=dr), (name,)).fetchone()
+    loved, dragged = pick("DESC"), pick("ASC")
     for l, head, hc, row in [(0.6, "💖 BEST TAKE", GREEN, loved), (6.85, "🔥 WORST TAKE", RED, dragged)]:
         card(s, l, 5.1, 5.88, 2.0, CARD)
         text(s, l + 0.3, 5.26, 5.3, 0.32, head, 12, hc)
         if row:
-            text(s, l + 0.3, 5.64, 5.3, 1.1, clean(row[0], 135), 13.5, WHITE, bold=False, spacing=1.04)
-            text(s, l + 0.3, 6.76, 5.3, 0.28, f"via {row[1]}", 10.5, GOLD)
+            q = clean(row[0])
+            text(s, l + 0.3, 5.62, 5.3, 1.12, q, fit_size(q, 5.0, 1.12, 11, 15), WHITE, bold=False, spacing=1.04)
+            text(s, l + 0.3, 6.78, 5.3, 0.26, f"via {row[1]}", 10.5, GOLD)
         else:
             text(s, l + 0.3, 5.7, 5.3, 0.5, "—", 14, MUTE, bold=False)
 
