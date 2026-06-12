@@ -8,11 +8,13 @@ Output: outputs/love_island_report.pptx
 
 from __future__ import annotations
 
+import argparse
 import math
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -233,9 +235,104 @@ def deep_dive(prs, name, kind, n, a):
             text(s, l + 0.3, 5.7, 5.3, 0.5, "—", 14, MUTE, bold=False)
 
 
+# ── "What changed since last time" ──────────────────────────────────────
+
+def fmt_baseline(iso):
+    try:
+        return datetime.fromisoformat(iso).astimezone(ZoneInfo("America/New_York")).strftime("%b %-d, %-I%p")
+    except Exception:
+        return "last time"
+
+
+def change_metrics(baseline):
+    c = db.connect()
+    b = baseline
+
+    def wins(et):
+        new = {e: (n, a) for e, n, a in c.execute(
+            "SELECT a.entity,COUNT(*),AVG(a.sentiment_score) FROM aspects a JOIN items i ON i.id=a.item_id "
+            "WHERE i.created_at>? AND a.entity_type=? GROUP BY a.entity", (b, et))}
+        old = {e: (n, a) for e, n, a in c.execute(
+            "SELECT a.entity,COUNT(*),AVG(a.sentiment_score) FROM aspects a JOIN items i ON i.id=a.item_id "
+            "WHERE i.created_at<=? AND a.entity_type=? GROUP BY a.entity", (b, et))}
+        return new, old
+
+    M = {}
+    M["new_count"] = c.execute("SELECT COUNT(*) FROM items WHERE created_at>? AND sentiment_label IS NOT NULL", (b,)).fetchone()[0]
+    M["avg_new"] = c.execute("SELECT AVG(sentiment_score) FROM items WHERE created_at>? AND sentiment_score IS NOT NULL", (b,)).fetchone()[0] or 0.0
+    M["avg_old"] = c.execute("SELECT AVG(sentiment_score) FROM items WHERE created_at<=? AND sentiment_score IS NOT NULL", (b,)).fetchone()[0] or 0.0
+    cn, co = wins("contestant")
+    mov = [(e, co[e][1], an, an - co[e][1]) for e, (nn, an) in cn.items() if nn >= 8 and e in co and co[e][0] >= 8]
+    M["risers"] = sorted([x for x in mov if x[3] > 0.03], key=lambda x: -x[3])[:4]
+    M["fallers"] = sorted([x for x in mov if x[3] < -0.03], key=lambda x: x[3])[:4]
+    M["buzz"] = sorted(cn.items(), key=lambda kv: -kv[1][0])[:1]
+    pn, po = wins("couple")
+    cm = [(e, po[e][1], an, an - po[e][1]) for e, (nn, an) in pn.items() if nn >= 4 and e in po and po[e][0] >= 4]
+    M["couples"] = sorted(cm, key=lambda x: -abs(x[3]))[:3]
+    M["fresh_burns"] = c.execute(
+        "SELECT text,source FROM items WHERE created_at>? AND funny>=0.5 AND sentiment_score<=-0.2 "
+        "AND LENGTH(text) BETWEEN 25 AND 210 ORDER BY funny DESC, like_count DESC LIMIT 2", (b,)).fetchall()
+    return M
+
+
+def _mover_rows(s, l, t, head, col, rows):
+    card(s, l, t, 5.9, 3.45)
+    text(s, l + 0.3, t + 0.22, 5.3, 0.4, head, 18, col, font=HEAD)
+    if not rows:
+        text(s, l + 0.3, t + 1.4, 5.3, 0.5, "No big swings this time.", 14, MUTE, bold=False)
+        return
+    for i, (e, ao, an, d) in enumerate(rows):
+        y = t + 0.8 + i * 0.62
+        text(s, l + 0.3, y, 2.3, 0.5, e, 18, WHITE, font=HEAD, anchor=MSO_ANCHOR.MIDDLE)
+        text(s, l + 2.55, y, 2.05, 0.5, f"{ao:+.2f} → {an:+.2f}", 14, MUTE, anchor=MSO_ANCHOR.MIDDLE)
+        text(s, l + 4.6, y, 1.1, 0.5, f"{d:+.2f}", 17, col, font=HEAD, anchor=MSO_ANCHOR.MIDDLE)
+
+
+def change_slides(prs, M, baseline):
+    lbl = fmt_baseline(baseline)
+    s = slide(prs)
+    title(s, f"what's moved since {lbl}", "Since We Last Looked 🔄")
+    delta = M["avg_new"] - M["avg_old"]
+    arrow, col = ("▼", RED) if delta < -0.01 else (("▲", GREEN) if delta > 0.01 else ("→", GOLD))
+    verdict = "the villa SOURED" if delta < -0.02 else ("the villa WARMED UP" if delta > 0.02 else "barely budged")
+    card(s, 0.7, 1.82, 11.95, 1.38, CARD2)
+    text(s, 1.1, 1.98, 7.4, 0.36, "THE VILLA'S MOOD", 14, MUTE)
+    text(s, 1.1, 2.34, 7.4, 0.8, f"{M['avg_old']:+.2f}   →   {M['avg_new']:+.2f}  {arrow}", 35, col, font=HEAD)
+    text(s, 8.7, 2.05, 3.8, 0.5, verdict, 18, WHITE, font=HEAD)
+    text(s, 8.7, 2.58, 3.8, 0.5, f"{M['new_count']:,} new comments", 14, MUTE, bold=False)
+    _mover_rows(s, 0.7, 3.45, "📈 RISING", GREEN, M["risers"])
+    _mover_rows(s, 6.75, 3.45, "📉 FALLING", RED, M["fallers"])
+
+    s = slide(prs)
+    title(s, "who blew up and the freshest tea", "The Episode Effect 🎬")
+    if M["buzz"]:
+        e, (nn, _a) = M["buzz"][0]
+        card(s, 0.7, 1.82, 11.95, 1.2, CARD2)
+        text(s, 1.1, 1.98, 7.0, 0.35, "🗣️ MAIN CHARACTER OF THE NIGHT", 14, MUTE)
+        text(s, 1.1, 2.32, 8.2, 0.7, e, 34, PINK, font=HEAD)
+        text(s, 9.0, 2.02, 3.4, 0.5, f"{nn:,} new mentions", 16, WHITE, font=HEAD, anchor=MSO_ANCHOR.MIDDLE)
+        text(s, 9.0, 2.52, 3.4, 0.45, "all eyes on them", 13, MUTE, bold=False)
+    text(s, 0.7, 3.3, 11.9, 0.35, "💔 COUPLE SHIFTS", 14, MUTE)
+    if M["couples"]:
+        for i, (e, ao, an, d) in enumerate(M["couples"]):
+            y = 3.72 + i * 0.48
+            c2 = GREEN if d >= 0 else RED
+            text(s, 0.9, y, 4.8, 0.4, f"{'▲' if d >= 0 else '▼'} {e}", 16, c2, font=HEAD, anchor=MSO_ANCHOR.MIDDLE)
+            text(s, 6.0, y, 2.6, 0.4, f"{ao:+.2f} → {an:+.2f}", 14, MUTE, anchor=MSO_ANCHOR.MIDDLE)
+            text(s, 8.8, y, 1.4, 0.4, f"{d:+.2f}", 15, c2, font=HEAD, anchor=MSO_ANCHOR.MIDDLE)
+    else:
+        text(s, 0.9, 3.72, 11.0, 0.4, "No notable couple swings since last time.", 14, MUTE, bold=False)
+    text(s, 0.7, 5.25, 11.9, 0.35, "🔥 FRESH OFF THE EPISODE", 14, MUTE)
+    for (l, t), (txt, src) in zip([(0.6, 5.62), (6.85, 5.62)], M["fresh_burns"]):
+        card(s, l, t, 5.88, 1.5)
+        q = clean(txt)
+        text(s, l + 0.3, t + 0.16, 5.3, 0.92, q, fit_size(q, 5.0, 0.9, 10.5, 13.5), WHITE, bold=False, spacing=1.02)
+        text(s, l + 0.3, t + 1.18, 5.3, 0.26, f"via {src}", 10, GOLD)
+
+
 # ── Build ────────────────────────────────────────────────────────────────
 
-def build(d):
+def build(d, baseline=None):
     prs = Presentation(); prs.slide_width = EMU_W; prs.slide_height = EMU_H
     span_hi = (d["span"][1] or "")[:10]
     best = d["couples"][0]; worst_c = d["couples"][-1]
@@ -268,7 +365,13 @@ def build(d):
     text(s, 1.1, 4.78, 11.2, 1.0, mood, 46, PINK, font=HEAD)
     text(s, 1.1, 5.85, 11.2, 0.7, f"{d['pos']*100:.0f}% feeling good  ·  {d['neg']*100:.0f}% absolutely seething  ·  the internet is FEASTING.", 17, WHITE, bold=False)
 
-    # 3 — The Mood Swing (overall sentiment over time)
+    # 3 & 4 — What changed since last time (only when we have a baseline)
+    if baseline:
+        cm = change_metrics(baseline)
+        if cm["new_count"] > 0:
+            change_slides(prs, cm, baseline)
+
+    # The Mood Swing (overall sentiment over time)
     s = slide(prs)
     title(s, "how the villa's mood has swung all season", "The Mood Swing 📈")
     ser = overall_series()
@@ -405,9 +508,18 @@ def build(d):
 
 
 if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--preview", action="store_true", help="don't update the 'last looked' snapshot")
+    ap.add_argument("--since", help="override the comparison baseline (ISO timestamp)")
+    args = ap.parse_args()
+
     data = fetch()
+    baseline = args.since or db.get_meta("deck_last_run")
     out = Path(__file__).resolve().parent.parent / "outputs" / "love_island_report.pptx"
     out.parent.mkdir(exist_ok=True)
-    prs = build(data)
+    prs = build(data, baseline)
     prs.save(out)
-    print(f"✅ Saved {out}  ({data['total']:,} comments, {len(prs.slides)} slides)")
+    if not args.preview:
+        db.set_meta("deck_last_run", datetime.now(timezone.utc).isoformat())
+    tag = f" · vs {fmt_baseline(baseline)}" if baseline else ""
+    print(f"✅ Saved {out}  ({data['total']:,} comments, {len(prs.slides)} slides{tag})")
