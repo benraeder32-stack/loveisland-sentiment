@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import math
 import re
+import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -519,7 +520,14 @@ if __name__ == "__main__":
     out.parent.mkdir(exist_ok=True)
     prs = build(data, baseline)
     prs.save(out)
-    if not args.preview:
+    note = ""
+    if not args.preview:  # production run: bookmark "now" and archive a versioned copy
         db.set_meta("deck_last_run", datetime.now(timezone.utc).isoformat())
+        archive_dir = out.parent / "decks"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().astimezone().strftime("%Y-%m-%d_%H%M")
+        archived = archive_dir / f"villa_report_{stamp}.pptx"
+        shutil.copyfile(out, archived)
+        note = f"\n   archived version → {archived}"
     tag = f" · vs {fmt_baseline(baseline)}" if baseline else ""
-    print(f"✅ Saved {out}  ({data['total']:,} comments, {len(prs.slides)} slides{tag})")
+    print(f"✅ Saved {out}  ({data['total']:,} comments, {len(prs.slides)} slides{tag}){note}")
